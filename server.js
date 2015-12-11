@@ -41,9 +41,9 @@ var config = {
 	ctHits: 0, ctHitsToday: 0, ctHitsThisRun:0, 
 	whenLastHit: new Date (0),
 	
-	rootDomain: "pocalyp.se",
-	flWatchAppDateChange: true,
-	fnameApp: "mypocalypse.js",
+	rootDomain: "mydomain.com",
+	flWatchAppDateChange: false,
+	fnameApp: "server.js",
 	createPath: "/" + utils.getRandomPassword (10), //the path you use to create a new short URL
 	
 	domainMap: {},
@@ -341,9 +341,6 @@ function startup () {
 		readStats (fnameConfig, config, function () {
 			config.ctStarts++;
 			config.ctHitsThisRun = 0;
-			if (config.whenFirstStart === undefined) {
-				config.whenFirstStart = whenStart;
-				}
 			config.whenLastStart = whenStart;
 			lastCtHits = config.ctHits;
 			flConfigDirty = true;
