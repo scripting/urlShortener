@@ -1,4 +1,4 @@
-var myVersion = "0.40p", myProductName = "urlShortener"; 
+var myVersion = "0.40r", myProductName = "urlShortener"; 
 
 /*  The MIT License (MIT)
 	Copyright (c) 2014-2015 Dave Winer
@@ -336,16 +336,16 @@ function everySecond () {
 		}
 	}
 function startup () {
-	utils.getFileModDate (config.fnameApp, function (appModDate) { //set origAppModDate
-		origAppModDate = appModDate;
-		readStats (fnameConfig, config, function () {
-			config.ctStarts++;
-			config.ctHitsThisRun = 0;
-			config.whenLastStart = whenStart;
-			lastCtHits = config.ctHits;
-			flConfigDirty = true;
+	readStats (fnameConfig, config, function () {
+		config.ctStarts++;
+		config.ctHitsThisRun = 0;
+		config.whenLastStart = whenStart;
+		lastCtHits = config.ctHits;
+		flConfigDirty = true;
+		utils.getFileModDate (config.fnameApp, function (appModDate) { //set origAppModDate
+			origAppModDate = appModDate;
 			http.createServer (handleHttpRequest).listen (config.myPort);
-			console.log (""); console.log (myProductName + " v" + myVersion + " running on port " + config.myPort + "."); console.log ("");
+			console.log ("\n" + myProductName + " v" + myVersion + " running on port " + config.myPort + ".\n");
 			setInterval (everySecond, 1000); 
 			setInterval (everyMinute, 60000); 
 			});
