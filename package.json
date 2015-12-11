@@ -1,0 +1,15 @@
+{
+	"name": "urlShortener",
+	"description": "A URL shortener.",
+	"author": "Dave Winer <dave@smallpicture.com>",
+	"version": "0.40.0",
+	"scripts": {
+		"start": "node server.js"
+		},
+	"dependencies" : {
+		}, 
+	"license": "MIT",
+	"engines": {
+		"node": "0.10.*"
+		}
+	}

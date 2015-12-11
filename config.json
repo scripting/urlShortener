@@ -1,0 +1,15 @@
+{
+	"myPort": 80,
+	"ctStarts": 0,
+	"ctWrites": 0,
+	"ctHits": 0,
+	"ctHitsToday": 0,
+	"ctHitsThisRun": 0,
+	"rootDomain": "mydomain.com",
+	"flWatchAppDateChange": false,
+	"fnameApp": "server.js",
+	"domainMap": {
+		},
+	"hitsByDomain": {
+		}
+	}
