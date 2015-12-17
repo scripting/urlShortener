@@ -22,6 +22,12 @@ Open the file in a text editor after launching the server to see the values it i
 
 A source <a href="http://scripting.com/listings/urlshortener.html">listing</a> that preserves the outline structure of the code might be useful for some. 
 
+#### Updates
+
+##### v0.41 12/16/15 by DW
+
+The home page of each sub-domain is now a JSON listing of all the items posted on that domain. 
+
 #### Questions
 
 Ask on the <a href="https://groups.google.com/forum/?fromgroups#!forum/server-snacks">server-snacks</a> mail list. 

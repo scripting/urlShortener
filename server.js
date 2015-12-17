@@ -1,4 +1,4 @@
-var myVersion = "0.40r", myProductName = "urlShortener"; 
+var myVersion = "0.41b", myProductName = "urlShortener"; 
 
 /*  The MIT License (MIT)
 	Copyright (c) 2014-2015 Dave Winer
@@ -31,7 +31,6 @@ var dns = require ("dns");
 var utils = require ("./lib/utils.js"); 
 
 var whenStart = new Date ();
-
 var config = {
 	myPort: 80,
 	whenFirstStart: whenStart, ctStarts: 0,
@@ -53,7 +52,38 @@ var fnameConfig = "config.json", flConfigDirty = false;
 var origAppModDate;
 var lastCtHits;
 
-
+function fsSureFilePath (path, callback) { 
+	var splits = path.split ("/");
+	path = ""; //1/8/15 by DW
+	if (splits.length > 0) {
+		function doLevel (levelnum) {
+			if (levelnum < (splits.length - 1)) {
+				path += splits [levelnum] + "/";
+				fs.exists (path, function (flExists) {
+					if (flExists) {
+						doLevel (levelnum + 1);
+						}
+					else {
+						fs.mkdir (path, undefined, function () {
+							doLevel (levelnum + 1);
+							});
+						}
+					});
+				}
+			else {
+				if (callback != undefined) {
+					callback ();
+					}
+				}
+			}
+		doLevel (0);
+		}
+	else {
+		if (callback != undefined) {
+			callback ();
+			}
+		}
+	}
 function findInDomainMap (domain, longUrl, callback) {
 	if (config.domainMap [domain] !== undefined) {
 		var thisDomainMap = config.domainMap [domain];
@@ -67,7 +97,6 @@ function findInDomainMap (domain, longUrl, callback) {
 		}
 	callback (undefined);
 	}
-
 function handleHttpRequest (httpRequest, httpResponse) {
 	function return404 () {
 		httpResponse.writeHead (404, {"Content-Type": "text/plain"});
@@ -116,18 +145,23 @@ function handleHttpRequest (httpRequest, httpResponse) {
 	function refShortUrl (host, path) {
 		var domain = utils.stringNthField (host, ".", 1);
 		var thisDomainMap = config.domainMap [domain];
-		if (thisDomainMap === undefined) {
-			return404 ();
+		if (path == "/") {
+			httpReturn (utils.jsonStringify (thisDomainMap));    
 			}
 		else {
-			var thisUrl = thisDomainMap.map [utils.stringDelete (path, 1, 1)];
-			if (thisUrl === undefined) {
+			if (thisDomainMap === undefined) {
 				return404 ();
 				}
 			else {
-				thisUrl.ct++;
-				flConfigDirty = true;
-				returnRedirect (thisUrl.url);
+				var thisUrl = thisDomainMap.map [utils.stringDelete (path, 1, 1)];
+				if (thisUrl === undefined) {
+					return404 ();
+					}
+				else {
+					thisUrl.ct++;
+					flConfigDirty = true;
+					returnRedirect (thisUrl.url);
+					}
 				}
 			}
 		}
@@ -207,12 +241,10 @@ function handleHttpRequest (httpRequest, httpResponse) {
 			else {
 				switch (lowerpath) {
 					case "/version":
-						httpResponse.writeHead (200, {"Content-Type": "text/plain"});
-						httpResponse.end (myVersion);    
+						httpReturn (myVersion);    
 						break;
 					case "/now": 
-						httpResponse.writeHead (200, {"Content-Type": "text/plain"});
-						httpResponse.end (now.toString ());    
+						httpReturn (now.toString ());    
 						break;
 					case "/status": 
 						var savedPath = config.createPath;
@@ -229,39 +261,6 @@ function handleHttpRequest (httpRequest, httpResponse) {
 	catch (err) {
 		httpResponse.writeHead (500, {"Content-Type": "text/plain"});
 		httpResponse.end (err.message);    
-		}
-	}
-
-function fsSureFilePath (path, callback) { 
-	var splits = path.split ("/");
-	path = ""; //1/8/15 by DW
-	if (splits.length > 0) {
-		function doLevel (levelnum) {
-			if (levelnum < (splits.length - 1)) {
-				path += splits [levelnum] + "/";
-				fs.exists (path, function (flExists) {
-					if (flExists) {
-						doLevel (levelnum + 1);
-						}
-					else {
-						fs.mkdir (path, undefined, function () {
-							doLevel (levelnum + 1);
-							});
-						}
-					});
-				}
-			else {
-				if (callback != undefined) {
-					callback ();
-					}
-				}
-			}
-		doLevel (0);
-		}
-	else {
-		if (callback != undefined) {
-			callback ();
-			}
 		}
 	}
 function writeStats (f, stats, callback) {
@@ -310,7 +309,6 @@ function readStats (f, stats, callback) {
 			});
 		});
 	}
-
 function everyMinute () {
 	var now = new Date ();
 	console.log ("\neveryMinute: " + now.toLocaleTimeString () + ", v" + myVersion + ", " + config.ctHitsThisRun + " hits");
