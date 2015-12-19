@@ -1,4 +1,4 @@
-var myVersion = "0.41b", myProductName = "urlShortener"; 
+var myVersion = "0.42d", myProductName = "urlShortener"; 
 
 /*  The MIT License (MIT)
 	Copyright (c) 2014-2015 Dave Winer
@@ -44,6 +44,7 @@ var config = {
 	flWatchAppDateChange: false,
 	fnameApp: "server.js",
 	createPath: "/" + utils.getRandomPassword (10), //the path you use to create a new short URL
+	domainsFolder: "domains/",
 	
 	domainMap: {},
 	hitsByDomain: {}
@@ -81,6 +82,31 @@ function fsSureFilePath (path, callback) {
 	else {
 		if (callback != undefined) {
 			callback ();
+			}
+		}
+	}
+function writeOneStaticFile (domain, key) {
+	var templatestring = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title></title><META HTTP-EQUIV="Refresh" CONTENT="0;URL=&lt;%longurl%&gt;"><meta name="robots" content="noindex"/><link rel="canonical" href="&lt;%longurl%&gt;"/></head><body></body></html>';
+	var url = config.domainMap [domain].map [key].url;
+	var s = utils.replaceAll (templatestring, "&lt;%longurl%&gt;", url);
+	var f = config.domainsFolder + domain + "." + config.rootDomain + "/" + key;
+	fsSureFilePath (f, function () {
+		fs.writeFile (f, s, function (err) {
+			if (err) {
+				console.log ("writeOneStaticFile: error creating file, f == " + f + ", err.message == " + err.message);
+				}
+			else {
+				console.log ("writeOneStaticFile: created file, f == " + f);
+				}
+			});
+		});
+	}
+function writeAllStaticFiles () {
+	for (var domain in config.domainMap) {
+		var thisDomainMap = config.domainMap [domain], folder = domain + "." + config.rootDomain;
+		for (s in thisDomainMap.map) {
+			var f = folder + s, url = thisDomainMap.map [s].url;
+			writeOneStaticFile (domain, s);
 			}
 		}
 	}
@@ -140,6 +166,7 @@ function handleHttpRequest (httpRequest, httpResponse) {
 		
 		thisDomainMap.nextstring = utils.bumpUrlString (thisString);
 		flConfigDirty = true;
+		writeOneStaticFile (domain, thisString); //12/19/15 by DW
 		return ("http://" + domain + "." + config.rootDomain + "/" + thisString);
 		}
 	function refShortUrl (host, path) {

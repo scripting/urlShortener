@@ -24,6 +24,14 @@ A source <a href="http://scripting.com/listings/urlshortener.html">listing</a> t
 
 #### Updates
 
+##### v0.42 12/19/15 by DW
+
+We maintain a folder of static files, arranged by domain, one for each URL. 
+
+The files contain the HTML needed to convert the shortener to a static site. You can drop those folders into the <i>domains</i> folder of <a href="https://github.com/scripting/pagepark">PagePark</a>, for example, and point the root domain at the server, it will serve the files. 
+
+I added this feature because eventually all servers go away, and when this one does, I want to be able to easily keep the links from breaking. 
+
 ##### v0.41 12/16/15 by DW
 
 The home page of each sub-domain is now a JSON listing of all the items posted on that domain. 
