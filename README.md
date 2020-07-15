@@ -1,8 +1,8 @@
-#### urlShortener
+# urlShortener
 
 A JavaScript URL shortener running in Node.js. 
 
-#### How to set up
+### How to set up
 
 Download the folder and open <a href="https://github.com/scripting/urlShortener/blob/master/config.json">config.json</a> in a text editor.
 
@@ -18,13 +18,19 @@ config.json is also where we store all the data for the server, including the UR
 
 Open the file in a text editor after launching the server to see the values it initializes. And you can watch it as it the app is running through the /status endpoint.
 
-#### Source listing
+### Source listing
 
 A source <a href="http://scripting.com/listings/urlshortener.html">listing</a> that preserves the outline structure of the code might be useful for some. 
 
-#### Updates
+### Updates
 
-##### v0.42 12/19/15 by DW
+#### v0.5.2 7/15/20 by DW
+
+Rebuilt the app using davehttp and daveutils, and deployed under PagePark. 
+
+Lots of little changes and simplifications. The development environment has improved a lot in 4.5 years. ;-)
+
+#### v0.42 12/19/15 by DW
 
 We maintain a folder of static files, arranged by domain, one for each URL. 
 
@@ -32,7 +38,7 @@ The files contain the HTML needed to convert the shortener to a static site. You
 
 I added this feature because eventually all servers go away, and when this one does, I want to be able to easily keep the links from breaking. 
 
-##### v0.41 12/16/15 by DW
+#### v0.41 12/16/15 by DW
 
 The home page of each sub-domain is now a JSON listing of all the items posted on that domain. 
 

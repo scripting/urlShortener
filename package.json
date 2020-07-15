@@ -2,11 +2,14 @@
 	"name": "urlShortener",
 	"description": "A URL shortener.",
 	"author": "Dave Winer <dave@smallpicture.com>",
-	"version": "0.40.0",
+	"repository": "https://github.com/scripting/urlShortener",
+	"version": "0.5.2",
 	"scripts": {
 		"start": "node server.js"
 		},
 	"dependencies" : {
+		"daveutils": "*",
+		"davehttp": "*"
 		}, 
 	"license": "MIT",
 	"engines": {

@@ -1,7 +1,7 @@
-var myVersion = "0.42d", myProductName = "urlShortener"; 
+var myVersion = "0.5.2", myProductName = "urlShortener"; 
 
 /*  The MIT License (MIT)
-	Copyright (c) 2014-2015 Dave Winer
+	Copyright (c) 2014-2020 Dave Winer
 	
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal
@@ -24,35 +24,38 @@ var myVersion = "0.42d", myProductName = "urlShortener";
 	structured listing: http://scripting.com/listings/urlshortener.html
 	*/
 
-var fs = require ("fs");
-var urlpack = require ("url");
-var http = require ("http");
-var dns = require ("dns");
-var utils = require ("./lib/utils.js"); 
+const fs = require ("fs");
+const utils = require ("daveutils"); 
+const davehttp = require ("davehttp");
 
 var whenStart = new Date ();
 var config = {
-	myPort: 80,
-	whenFirstStart: whenStart, ctStarts: 0,
-	whenLastStart: undefined,
-	ctWrites: 0,
-	
-	ctHits: 0, ctHitsToday: 0, ctHitsThisRun:0, 
-	whenLastHit: new Date (0),
-	
-	rootDomain: "mydomain.com",
-	flWatchAppDateChange: false,
-	fnameApp: "server.js",
-	createPath: "/" + utils.getRandomPassword (10), //the path you use to create a new short URL
+	port: process.env.PORT || 1421,
+	flLogToConsole: true,
+	flAllowAccessFromAnywhere: true,
+	rootDomain: "localhost",
+	createPath: "/create", //the path you use to create a new short URL
 	domainsFolder: "domains/",
-	
-	domainMap: {},
-	hitsByDomain: {}
+	homePagesFolder: "homePages/",
 	};
-var fnameConfig = "config.json", flConfigDirty = false;
+var fnameConfig = "config.json";
 var origAppModDate;
 var lastCtHits;
 
+var stats = {
+	whenFirstStart: whenStart, ctStarts: 0,
+	whenLastStart: undefined,
+	ctWrites: 0,
+	ctHits: 0, ctHitsToday: 0, ctHitsThisRun:0, 
+	whenLastHit: new Date (0),
+	domainMap: {},
+	hitsByDomain: {}
+	};
+var fnameStats = "stats.json", flStatsChanged = false;
+
+function statsChanged () {
+	flStatsChanged = true;
+	}
 function fsSureFilePath (path, callback) { 
 	var splits = path.split ("/");
 	path = ""; //1/8/15 by DW
@@ -87,7 +90,7 @@ function fsSureFilePath (path, callback) {
 	}
 function writeOneStaticFile (domain, key) {
 	var templatestring = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title></title><META HTTP-EQUIV="Refresh" CONTENT="0;URL=&lt;%longurl%&gt;"><meta name="robots" content="noindex"/><link rel="canonical" href="&lt;%longurl%&gt;"/></head><body></body></html>';
-	var url = config.domainMap [domain].map [key].url;
+	var url = stats.domainMap [domain].map [key].url;
 	var s = utils.replaceAll (templatestring, "&lt;%longurl%&gt;", url);
 	var f = config.domainsFolder + domain + "." + config.rootDomain + "/" + key;
 	fsSureFilePath (f, function () {
@@ -102,8 +105,8 @@ function writeOneStaticFile (domain, key) {
 		});
 	}
 function writeAllStaticFiles () {
-	for (var domain in config.domainMap) {
-		var thisDomainMap = config.domainMap [domain], folder = domain + "." + config.rootDomain;
+	for (var domain in stats.domainMap) {
+		var thisDomainMap = stats.domainMap [domain], folder = domain + "." + config.rootDomain;
 		for (s in thisDomainMap.map) {
 			var f = folder + s, url = thisDomainMap.map [s].url;
 			writeOneStaticFile (domain, s);
@@ -111,8 +114,8 @@ function writeAllStaticFiles () {
 		}
 	}
 function findInDomainMap (domain, longUrl, callback) {
-	if (config.domainMap [domain] !== undefined) {
-		var thisDomainMap = config.domainMap [domain];
+	if (stats.domainMap [domain] !== undefined) {
+		var thisDomainMap = stats.domainMap [domain];
 		for (var x in thisDomainMap.map) {
 			var item = thisDomainMap.map [x];
 			if (item.url == longUrl) { //match
@@ -123,33 +126,54 @@ function findInDomainMap (domain, longUrl, callback) {
 		}
 	callback (undefined);
 	}
-function handleHttpRequest (httpRequest, httpResponse) {
-	function return404 () {
-		httpResponse.writeHead (404, {"Content-Type": "text/plain"});
-		httpResponse.end ("File not found"); 
+function handleHttpRequest (theRequest) {
+	const params = theRequest. params;
+	const now = new Date ();
+	
+	function returnPlainText (s) {
+		theRequest.httpReturn (200, "text/plain", s.toString ());
 		}
-	function httpReturn (val, type) { 
-		if (type === undefined) {
-			type = "text/plain";
+	function returnData (jstruct) {
+		if (jstruct === undefined) {
+			jstruct = {};
 			}
-		httpResponse.writeHead (200, {"Content-Type": type, "Access-Control-Allow-Origin": "*"});
-		httpResponse.end (val.toString ());    
+		theRequest.httpReturn (200, "application/json", utils.jsonStringify (jstruct));
+		}
+	function returnHtml (htmltext) {
+		theRequest.httpReturn (200, "text/html", htmltext);
+		}
+	function returnXml (xmltext) {
+		theRequest.httpReturn (200, "text/xml", xmltext);
+		}
+	function returnNotFound () {
+		theRequest.httpReturn (404, "text/plain", "Not found.");
+		}
+	function returnError (jstruct) {
+		theRequest.httpReturn (500, "application/json", utils.jsonStringify (jstruct));
 		}
 	function returnRedirect (url) {
-		httpResponse.writeHead (302, {"location": url});
-		httpResponse.end ("302 REDIRECT"); 
+		theRequest.httpReturn (302, "text/plain", "302 redirect", {location: url});
+		}
+	function httpReturn (err, jstruct) {
+		if (err) {
+			returnError (err);
+			}
+		else {
+			returnData (jstruct);
+			}
 		}
 	function createShortUrl (domain, longUrl, title, description) {
 		var now = new Date ();
 		
-		if (config.domainMap [domain] === undefined) {
-			config.domainMap [domain] = {
+		if (stats.domainMap [domain] === undefined) {
+			stats.domainMap [domain] = {
 				nextstring: "0",
 				map: {}
 				};
+			statsChanged ();
 			}
 		
-		var thisDomainMap = config.domainMap [domain];
+		var thisDomainMap = stats.domainMap [domain];
 		var thisString = thisDomainMap.nextstring;
 		var jstruct = {
 			url: longUrl,
@@ -162,215 +186,126 @@ function handleHttpRequest (httpRequest, httpResponse) {
 		if (description != undefined) {
 			jstruct.description = description;
 			}
+		console.log ("createShortUrl: jstruct == " + utils.jsonStringify (jstruct));
 		thisDomainMap.map [thisString] = jstruct;
 		
 		thisDomainMap.nextstring = utils.bumpUrlString (thisString);
-		flConfigDirty = true;
+		statsChanged ();
 		writeOneStaticFile (domain, thisString); //12/19/15 by DW
 		return ("http://" + domain + "." + config.rootDomain + "/" + thisString);
 		}
+	function returnDomain (domain) { //6/29/16 by DW
+		var f = config.homePagesFolder + domain + "/index.html";
+		fs.readFile (f, function (err, data) {
+			if (err) {
+				var thisDomainMap = stats.domainMap [domain];
+				if (thisDomainMap === undefined) {
+					const err = {
+						message: "Can't return the domain contents because there is no " + domain + " domain."
+						}
+					returnError (err);
+					}
+				else {
+					returnData (thisDomainMap)
+					}
+				}
+			else {
+				console.log ("returnDomain: f == " + f);
+				returnHtml (data.toString ());
+				}
+			});
+		}
 	function refShortUrl (host, path) {
 		var domain = utils.stringNthField (host, ".", 1);
-		var thisDomainMap = config.domainMap [domain];
+		var thisDomainMap = stats.domainMap [domain];
 		if (path == "/") {
-			httpReturn (utils.jsonStringify (thisDomainMap));    
+			returnDomain (domain); //6/29/16 by DW
 			}
 		else {
 			if (thisDomainMap === undefined) {
-				return404 ();
+				returnNotFound ();
 				}
 			else {
 				var thisUrl = thisDomainMap.map [utils.stringDelete (path, 1, 1)];
 				if (thisUrl === undefined) {
-					return404 ();
+					returnNotFound ();
 					}
 				else {
 					thisUrl.ct++;
-					flConfigDirty = true;
+					statsChanged ();
 					returnRedirect (thisUrl.url);
 					}
 				}
 			}
 		}
-	try {
-		var parsedUrl = urlpack.parse (httpRequest.url, true), host, lowerhost, port, referrer;
-		var lowerpath = parsedUrl.pathname.toLowerCase (), now = new Date ();
-		//set host, port
-			host = httpRequest.headers.host;
-			if (utils.stringContains (host, ":")) {
-				port = utils.stringNthField (host, ":", 2);
-				host = utils.stringNthField (host, ":", 1);
-				}
-			else {
-				port = 80;
-				}
-			lowerhost = host.toLowerCase ();
-		//set referrer
-			referrer = httpRequest.headers.referer;
-			if (referrer == undefined) {
-				referrer = "";
-				}
-			
-		//stats
-			//hits by domain
-				if (config.hitsByDomain [lowerhost] == undefined) {
-					config.hitsByDomain [lowerhost] = 1;
+	
+	//stats
+		stats.ctHits++;
+		stats.tHitsToday++;
+		stats.ctHitsThisRun++;
+		stats.whenLastHit = now;
+		statsChanged ();
+	
+	switch (theRequest.lowerpath) {
+		case config.createPath:
+			findInDomainMap (params.domain, params.longUrl, function (item, key) {
+				if (item !== undefined) {
+					returnPlainText ("http://" + params.domain + "." + config.rootDomain + "/" + key);
 					}
 				else {
-					config.hitsByDomain [lowerhost]++;
+					returnPlainText (createShortUrl (params.domain, params.longUrl, params.title, params.description));    
 					}
-			//hits today
-				if (!utils.sameDay (now, config.whenLastHit)) { //day rollover
-					config.ctHitsToday = 0;
-					}
-			config.ctHits++;
-			config.ctHitsToday++;
-			config.ctHitsThisRun++;
-			config.whenLastHit = now;
-			flStatsDirty = true;
-		
-		//log the request
-			dns.reverse (httpRequest.connection.remoteAddress, function (err, domains) {
-				var client = httpRequest.connection.remoteAddress;
-				if (!err) {
-					if (domains.length > 0) {
-						client = domains [0];
-						}
-					}
-				if (client == undefined) { //1/25/15 by DW
-					client = "";
-					}
-				console.log (now.toLocaleTimeString () + " " + httpRequest.method + " " + host + ":" + port + " " + lowerpath + " " + referrer + " " + client);
 				});
-		//handle the request
-			if (lowerpath == config.createPath) {
-				var domain = parsedUrl.query.domain, longUrl = parsedUrl.query.url;
-				var title = parsedUrl.query.title, description = parsedUrl.query.description;
-				if (domain === undefined) {
-					throw {
-						message: "Can't create the short url because the \"domain\" parameter is not provided."
-						};
-					}
-				if (longUrl === undefined) {
-					throw {
-						message: "Can't create the short url because the \"url \"parameter is not provided."
-						};
-					}
-				findInDomainMap (domain, longUrl, function (item, key) {
-					if (item !== undefined) {
-						httpReturn ("http://" + domain + "." + config.rootDomain + "/" + key);
-						}
-					else {
-						httpReturn (createShortUrl (domain, longUrl, title, description));    
-						}
-					});
-				}
-			else {
-				switch (lowerpath) {
-					case "/version":
-						httpReturn (myVersion);    
-						break;
-					case "/now": 
-						httpReturn (now.toString ());    
-						break;
-					case "/status": 
-						var savedPath = config.createPath;
-						config.createPath = "";
-						httpReturn (utils.jsonStringify (config));    
-						config.createPath = savedPath;
-						break;
-					default:
-						refShortUrl (host, parsedUrl.pathname);
-						break;
-					}
-				}
+			return;
+		default:
+			refShortUrl (theRequest.host, theRequest.lowerpath);
+			return;
 		}
-	catch (err) {
-		httpResponse.writeHead (500, {"Content-Type": "text/plain"});
-		httpResponse.end (err.message);    
-		}
+	theRequest.httpReturn (404, "text/plain", "Not found.");
 	}
-function writeStats (f, stats, callback) {
-	fsSureFilePath (f, function () {
-		fs.writeFile (f, utils.jsonStringify (stats), function (err) {
-			if (err) {
-				console.log ("writeStats: error == " + err.message);
+function readConfig (f, theConfig, callback) { //7/14/20 by DW
+	fs.readFile (f, function (err, jsontext) {
+		if (!err) {
+			try {
+				var jstruct = JSON.parse (jsontext);
+				for (var x in jstruct) {
+					theConfig [x] = jstruct [x];
+					}
 				}
-			if (callback != undefined) {
-				callback ();
+			catch (err) {
+				console.log ("readConfig: err.message == " + err.message);
 				}
-			});
-		});
-	}
-function readStats (f, stats, callback) {
-	fsSureFilePath (f, function () {
-		fs.exists (f, function (flExists) {
-			if (flExists) {
-				fs.readFile (f, function (err, data) {
-					if (err) {
-						console.log ("readStats: error reading file " + f + " == " + err.message)
-						if (callback != undefined) {
-							callback ();
-							}
-						}
-					else {
-						var storedStats = JSON.parse (data.toString ());
-						for (var x in storedStats) {
-							stats [x] = storedStats [x];
-							}
-						writeStats (f, stats, function () {
-							if (callback != undefined) {
-								callback ();
-								}
-							});
-						}
-					});
-				}
-			else {
-				writeStats (f, stats, function () {
-					if (callback != undefined) {
-						callback ();
-						}
-					});
-				}
-			});
+			}
+		else {
+			console.log ("readConfig: err.message == " + err.message);
+			}
+		callback ();
 		});
 	}
 function everyMinute () {
 	var now = new Date ();
-	console.log ("\neveryMinute: " + now.toLocaleTimeString () + ", v" + myVersion + ", " + config.ctHitsThisRun + " hits");
-	if (lastCtHits != config.ctHits) {
-		flConfigDirty = true;
+	if (now.getMinutes () == 0) {
+		console.log ("\n" + now.toLocaleTimeString () + ": " + myProductName + " v" + myVersion + " running on port " + config.port + ".\n");
 		}
-	if (flConfigDirty) {
-		flConfigDirty = false;
-		config.ctWrites++;
-		writeStats (fnameConfig, config, function () {
-			writeStats (utils.getDatePath (new Date (), false) + ".json", config);
+	if (flStatsChanged) {
+		stats.ctWrites++;
+		flStatsChanged = false;
+		fs.writeFile (fnameStats, utils.jsonStringify (stats), function () {
 			});
 		}
 	}
 function everySecond () {
-	if (config.flWatchAppDateChange) { 
-		utils.getFileModDate (config.fnameApp, function (theModDate) {
-			if (theModDate != origAppModDate) {
-				console.log ("everySecond: " + config.fnameApp + " has been updated. " + myProductName + " is quitting now.");
-				process.exit (0);
-				}
-			});
-		}
 	}
 function startup () {
-	readStats (fnameConfig, config, function () {
-		config.ctStarts++;
-		config.ctHitsThisRun = 0;
-		config.whenLastStart = whenStart;
-		lastCtHits = config.ctHits;
-		flConfigDirty = true;
-		utils.getFileModDate (config.fnameApp, function (appModDate) { //set origAppModDate
-			origAppModDate = appModDate;
-			http.createServer (handleHttpRequest).listen (config.myPort);
-			console.log ("\n" + myProductName + " v" + myVersion + " running on port " + config.myPort + ".\n");
+	readConfig (fnameConfig, config, function () {
+		readConfig (fnameStats, stats, function () {
+			stats.ctStarts++;
+			stats.ctHitsThisRun = 0;
+			stats.whenLastStart = whenStart;
+			statsChanged ();
+			console.log ("\n" + myProductName + " v" + myVersion + " running on port " + config.port + ".\n");
+			console.log ("config == " + utils.jsonStringify (config)); 
+			davehttp.start (config, handleHttpRequest);
 			setInterval (everySecond, 1000); 
 			setInterval (everyMinute, 60000); 
 			});
