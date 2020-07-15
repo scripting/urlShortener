@@ -1,5 +1,5 @@
 {
-	"port": process.env.PORT || 80,
+	"port": 80,
 	"rootDomain": "mydomain.com",
 	"createPath": "/createshorturl"
 	}
